@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>🐟 摸鱼幸存者</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#080b11}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  #cv{position:fixed;inset:0;display:block}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #topLeft{position:absolute;left:18px;top:18px}
+  .bar{
+    position:relative;width:230px;height:22px;border-radius:11px;overflow:hidden;
+    background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+    margin-bottom:7px;
+  }
+  .bar.small{height:15px;width:230px}
+  .bar .fill{height:100%;width:100%;transition:width .1s linear;border-radius:11px}
+  #hpfill{background:linear-gradient(90deg,#ff3d68,#ff8fa3)}
+  #xpfill{background:linear-gradient(90deg,#2563eb,#22d3ee);width:0%}
+  .bar .txt{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:11.5px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.85);
+    letter-spacing:.3px;
+  }
+  .bar.small .txt{font-size:10.5px}
+  #topRight{position:absolute;right:20px;top:18px;text-align:right;color:#cfe2ff}
+  #timer{font-size:26px;font-weight:800;letter-spacing:1px;text-shadow:0 2px 12px rgba(80,160,255,.5)}
+  #kills{font-size:14px;font-weight:600;margin-top:4px;color:#8fa8c8}
+
+  /* ---------- 遮罩层 ---------- */
+  .overlay{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(4,7,12,.84);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+    z-index:10;padding:20px;
+  }
+  .overlay.hidden{display:none}
+  .panel{
+    background:linear-gradient(160deg,#141a25,#0c111a);
+    border:1px solid rgba(110,165,255,.16);
+    border-radius:20px;padding:34px 38px;width:100%;max-width:600px;text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.06);
+    animation:pop .22s ease-out;
+  }
+  @keyframes pop{from{transform:scale(.93);opacity:0}to{transform:scale(1);opacity:1}}
+  .panel h1{font-size:27px;color:#e6f1ff;margin-bottom:10px;letter-spacing:.5px}
+  .panel h2{font-size:20px;color:#dbe9ff;letter-spacing:.5px}
+  .sub{color:#7f96b3;font-size:13.5px;line-height:1.8;margin-bottom:8px}
+  .keys{margin:22px 0 4px;display:flex;flex-direction:column;gap:9px;color:#93a9c4;font-size:13.5px}
+  .keys b{color:#4fd1ff}
+  kbd{
+    display:inline-block;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);
+    border-radius:5px;padding:1px 7px;font-size:12px;color:#cfe2ff;font-family:inherit;
+  }
+  .btn{
+    margin-top:26px;padding:13px 46px;font-size:16px;font-weight:800;letter-spacing:1px;
+    color:#04121f;background:linear-gradient(135deg,#5fd8ff,#3b82f6);
+    border:none;border-radius:13px;cursor:pointer;font-family:inherit;
+    transition:transform .14s,box-shadow .14s;
+    box-shadow:0 6px 20px rgba(59,130,246,.35);
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(70,150,255,.5)}
+  .btn:active{transform:translateY(0) scale(.98)}
+
+  /* ---------- 升级卡片 ---------- */
+  .cards{display:flex;gap:14px;margin-top:24px;flex-wrap:wrap;justify-content:center}
+  .card{
+    flex:1 1 150px;min-width:145px;max-width:180px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(110,165,255,.2);
+    border-radius:15px;padding:20px 14px 18px;cursor:pointer;
+    transition:transform .14s,border-color .14s,background .14s,box-shadow .14s;
+  }
+  .card:hover{
+    transform:translateY(-5px);border-color:rgba(120,205,255,.75);
+    background:rgba(70,150,255,.13);box-shadow:0 14px 34px rgba(50,130,255,.28);
+  }
+  .card .ico{font-size:36px;line-height:1}
+  .card .nm{font-size:15px;font-weight:800;color:#e8f2ff;margin:11px 0 7px}
+  .card .ds{font-size:12.5px;color:#8ba3c0;line-height:1.55}
+  .card .lv{font-size:10.5px;color:#5b7characters}
+  .card .cnt{font-size:10.5px;color:#5f7897;margin-top:8px;letter-spacing:.5px}
+
+  #overStats{
+    display:flex;justify-content:center;gap:34px;margin:26px 0 4px;
+  }
+  #overStats div{color:#7f96b3;font-size:12.5px}
+  #overStats b{display:block;font-size:23px;color:#4fd1ff;margin-top:5px;font-weight:800}
+
+  @media (max-width:560px){
+    .panel{padding:26px 20px}
+    .bar{width:170px}
+    .cards{gap:10px}
+    .card{min-width:110px;padding:15px 10px}
+    #timer{font-size:20px}
+  }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div id="topLeft">
+    <div class="bar"><div class="fill" id="hpfill"></div><div class="txt" id="hptxt">100 / 100</div></div>
+    <div class="bar small"><div class="fill" id="xpfill"></div><div class="txt" id="xptxt">Lv.1</div></div>
+  </div>
+  <div id="topRight">
+    <div id="timer">00:00</div>
+    <div id="kills">☠ 0</div>
+  </div>
+</div>
+
+<!-- 开始界面 -->
+<div id="start" class="overlay">
+  <div class="panel">
+    <h1>🐟 摸鱼幸存者</h1>
+    <p class="sub">在被工作彻底淹没之前，摸到最后一刻</p>
+    <div class="keys">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 移动（手机可直接拖动屏幕）</span>
+      <span>自动攻击最近的敌人，你只管跑</span>
+      <span>捡起经验宝石升级，三选一强化</span>
+      <span>按 <kbd>ESC</kbd> 暂停</span>
+    </div>
+    <button class="btn" id="btnStart">开始摸鱼</button>
+  </div>
+</div>
+
+<!-- 升级界面 -->
+<div id="levelup" class="overlay hidden">
+  <div class="panel">
+    <h2>⬆️ 升级！选择一项强化</h2>
+    <div class="cards" id="cards"></div>
+  </div>
+</div>
+
+<!-- 暂停 -->
+<div id="paused" class="overlay hidden">
+  <div class="panel">
+    <h1>⏸ 已暂停</h1>
+    <p class="sub">老板来了？再按一次 ESC 继续摸鱼</p>
+    <button class="btn" id="btnResume">继续</button>
+  </div>
+</div>
+
+<!-- 结束 -->
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <h1>💀 你被工作吞没了</h1>
+    <div id="overStats">
+      <div>存活时间<b id="stTime">0s</b></div>
+      <div>击杀数<b id="stKill">0</b></div>
+      <div>等级<b id="stLv">1</b></div>
+    </div>
+    <button class="btn" id="btnRetry">再摸一次</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   基础工具
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const cv = $('cv');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0;
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width  = Math.floor(W * dpr);
+  cv.height = Math.floor(H * dpr);
+  cv.style.width  = W + 'px';
+  cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+const rand  = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const dist2 = (x1, y1, x2, y2) => { const dx = x1 - x2, dy = y1 - y2; return dx*dx + dy*dy; };
+
+/* =========================================================
+   输入
+   ========================================================= */
+const keys = {};
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if (k === 'escape') togglePause();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+  if (G && G.state === 'playing') togglePause();
+});
+
+// 触屏：手指按住哪里，鱼就往哪里跑
+const touch = { active: false, x: 0, y: 0 };
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touch.active = true; touch.x = t.clientX; touch.y = t.clientY;
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touch.x = t.clientX; touch.y = t.clientY;
+}, { passive: false });
+cv.addEventListener('touchend', e => { e.preventDefault(); touch.active = false; }, { passive: false });
+cv.addEventListener('touchcancel', () => { touch.active = false; });
+
+/* =========================================================
+   数据配置
+   ========================================================= */
+const ENEMY_TYPES = {
+  mail: { emoji: '📧', hp: 12,  speed: 56,  r: 13, dmg: 6,  xp: 1, color: '#5aa9e6' },
+  bug:  { emoji: '🐛', hp: 8,   speed: 112, r: 11, dmg: 5,  xp: 1, color: '#6ee7a8' },
+  task: { emoji: '📋', hp: 26,  speed: 78,  r: 14, dmg: 8,  xp: 2, color: '#a78bfa' },
+  meet: { emoji: '📅', hp: 46,  speed: 44,  r: 17, dmg: 11, xp: 3, color: '#fbbf24' },
+  boss: { emoji: '👔', hp: 190, speed: 38,  r: 23, dmg: 18, xp: 9, color: '#ff6b6b' }
+};
+
+const UPGRADES = [
+  { id:'dmg',    icon:'💥', name:'嘴炮强化',   desc:'子弹伤害 +7',            max:99, apply:p => p.dmg += 7 },
+  { id:'rate',   icon:'⚡', name:'手速拉满',   desc:'攻击速度 +18%',          max:14, apply:p => p.fireRate *= 1.18 },
+  { id:'spd',    icon:'👟', name:'摸鱼身法',   desc:'移动速度 +12%',          max:6,  apply:p => p.speed *= 1.12 },
+  { id:'multi',  icon:'🔱', name:'多重摸鱼',   desc:'同时发射的子弹 +1',      max:4,  apply:p => p.multishot += 1 },
+  { id:'pierce', icon:'🗡️', name:'穿透打工人', desc:'子弹可多穿透 1 个敌人',  max:4,  apply:p => p.pierce += 1 },
+  { id:'hp',     icon:'❤️', name:'摸鱼底气',   desc:'最大生命 +25 并回满',    max:6,  apply:p => { p.maxHp += 25; p.hp = p.maxHp; } },
+  { id:'pick',   icon:'🧲', name:'摸鱼气场',   desc:'经验拾取范围 +45',       max:5,  apply:p => p.pickup += 45 },
+  { id:'regen',  icon:'🌿', name:'带薪养生',   desc:'每秒回复生命 +0.9',      max:5,  apply:p => p.regen += 0.9 },
+  { id:'bspd',   icon:'🎯', name:'子弹加速',   desc:'子弹飞行速度 +25%',      max:4,  apply:p => p.bulletSpeed *= 1.25 },
+  { id:'range',  icon:'🔭', name:'摸鱼视野',   desc:'索敌范围 +150',          max:4,  apply:p => p.range += 150 },
+  { id:'xp',     icon:'📈', name:'经验加成',   desc:'获得经验 +25%',          max:4,  apply:p => p.xpMul *= 1.25 },
+  { id:'armor',  icon:'🛡️', name:'厚脸皮',     desc:'受到的伤害 -12%',        max:4,  apply:p => p.armor *= 0.88 }
+];
+
+const FALLBACK_UP = {
+  id:'heal', icon:'🍗', name:'带薪干饭', desc:'立刻回满生命', max:99,
+  apply: p => { p.hp = p.maxHp; }
+};
+
+/* =========================================================
+   游戏状态
+   ========================================================= */
+let G = null;
+let lastT = performance.now();
+
+function xpFor(level){
+  return Math.floor(4 + level * 2.5 + level * level * 0.25);
+}
+
+function newGame(){
+  G = {
+    state: 'playing',
+    time: 0,
+    kills: 0,
+    level: 1,
+    xp: 0,
+    xpNeed: xpFor(1),
+    enemies: [],
+    bullets: [],
+    gems: [],
+    particles: [],
+    spawnTimer: 0.6,
+    upCounts: {},
+    shake: 0,
+    flash: 0,
+    player: {
+      x: W / 2, y: H / 2, r: 15,
+      speed: 215,
+      hp: 110, maxHp: 110,
+      dmg: 12,
+      fireRate: 1.6,
+      fireCd: 0,
+      bulletSpeed: 520,
+      multishot: 1,
+      pierce: 0,
+      pickup: 75,
+      regen: 0,
+      range: 620,
+      armor: 1,
+      xpMul: 1,
+      hurtCd: 0
+    }
+  };
+  updateHUD();
+}
+
+/* =========================================================
+   核心逻辑
+   ========================================================= */
+function update(dt){
+  const p = G.player;
+  G.time += dt;
+
+  /* ---- 移动 ---- */
+  let mx = 0, my = 0;
+  if (keys['a'] || keys['arrowleft'])  mx -= 1;
+  if (keys['d'] || keys['arrowright']) mx += 1;
+  if (keys['w'] || keys['arrowup'])    my -= 1;
+  if (keys['s'] || keys['arrowdown'])  my += 1;
+
+  if (touch.active){
+    const dx = touch.x - p.x, dy = touch.y - p.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 18){ mx += dx / d; my += dy / d; }
+  }
+
+  const len = Math.hypot(mx, my);
+  if (len > 0.01){
+    p.x += (mx / len) * p.speed * dt;
+    p.y += (my / len) * p.speed * dt;
+  }
+  p.x = clamp(p.x, p.r, W - p.r);
+  p.y = clamp(p.y, p.r, H - p.r);
+
+  /* ---- 状态计时 ---- */
+  if (p.regen > 0) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
+  if (p.hurtCd > 0) p.hurtCd -= dt;
+  if (G.shake > 0)  G.shake = Math.max(0, G.shake - dt * 45);
+  if (G.flash > 0)  G.flash = Math.max(0, G.flash - dt * 2.2);
+
+  /* ---- 开火 ---- */
+  p.fireCd -= dt;
+  if (p.fireCd <= 0){
+    const tgt = nearestEnemy(p.x, p.y, p.range);
+    if (tgt){
+      shoot(tgt);
+      p.fireCd = 1 / p.fireRate;
+    } else {
+      p.fireCd = 0.08;
+    }
+  }
+
+  /* ---- 生成敌人 ---- */
+  G.spawnTimer -= dt;
+  if (G.spawnTimer <= 0){
+    G.spawnTimer = Math.max(0.22, 1.0 - G.time * 0.0045);
+    if (G.enemies.length < 220){
+      const n = 1 + Math.min(2, Math.floor(G.time / 50));
+      for (let i = 0; i < n; i++) spawnEnemy();
+    }
+  }
+
+  /* ---- 子弹 ---- */
+  for (let i = G.bullets.length - 1; i >= 0; i--){
+    const b = G.bullets[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+
+    let dead = b.life <= 0 || b.x < -60 || b.x > W + 60 || b.y < -60 || b.y > H + 60;
+
+    if (!dead){
+      for (let j = 0; j < G.enemies.length; j++){
+        const e = G.enemies[j];
+        if (e.dead || e.hp <= 0) continue;
+        const rr = e.r + b.r;
+        if (dist2(b.x, b.y, e.x, e.y) < rr * rr){
+          hurtEnemy(e, b.dmg);
+          spawnParticles(b.x, b.y, '#9fe8ff', 3);
+          if (b.pierce > 0) b.pierce--;
+          else { dead = true; }
+          break;
+        }
+      }
+    }
+    if (dead) G.bullets.splice(i, 1);
+  }
+
+  /* ---- 敌人 ---- */
+  for (let i = G.enemies.length - 1; i >= 0; i--){
+    const e = G.enemies[i];
+    if (e.dead){ G.enemies.splice(i, 1); continue; }
+    if (e.flash > 0) e.flash -= dt;
+
+    const dx = p.x - e.x, dy = p.y - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    e.x += (dx / d) * e.speed * dt;
+    e.y += (dy / d) * e.speed * dt;
+
+    // 碰到玩家
+    const rr = e.r + p.r;
+    if (d < rr && p.hurtCd <= 0){
+      damagePlayer(e.dmg);
+    }
+  }
+
+  /* ---- 经验宝石 ---- */
+  for (let i = G.gems.length - 1; i >= 0; i--){
+    const g = G.gems[i];
+    const dx = p.x - g.x, dy = p.y - g.y;
+    const d = Math.hypot(dx, dy) || 1;
+
+    if (d < p.pickup){
+      const sp = 340 + (p.pickup - d) * 7;
+      g.x += (dx / d) * sp * dt;
+      g.y += (dy / d) * sp * dt;
+    }
+    if (d < p.r + 10){
+      gainXp(g.value);
+      G.gems.splice(i, 1);
+    }
+  }
+
+  /* ---- 粒子 ---- */
+  for (let i = G.particles.length - 1; i >= 0; i--){
+    const pt = G.particles[i];
+    pt.x += pt.vx * dt;
+    pt.y += pt.vy * dt;
+    pt.vx *= 0.93;
+    pt.vy *= 0.93;
+    pt.life -= dt;
+    if (pt.life <= 0) G.particles.splice(i, 1);
+  }
+}
+
+/* ---------- 辅助函数 ---------- */
+function nearestEnemy(x, y, range){
+  let best = null, bd = range * range;
+  for (let i = 0; i < G.enemies.length; i++){
+    const e = G.enemies[i];
+    if (e.dead || e.hp <= 0) continue;
+    const d = dist2(x, y, e.x, e.y);
+    if (d < bd){ bd = d; best = e; }
+  }
+  return best;
+}
+
+function shoot(tgt){
+  const p = G.player;
+  const base = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+  const n = p.multishot;
+  const spread = 0.15;
+
+  for (let i = 0; i < n; i++){
+    const off = (i - (n - 1) / 2) * spread;
+    const a = base + off;
+    G.bullets.push({
+      x: p.x + Math.cos(a) * p.r,
+      y: p.y + Math.sin(a) * p.r,
+      vx: Math.cos(a) * p.bulletSpeed,
+      vy: Math.sin(a) * p.bulletSpeed,
+      r: 5, dmg: p.dmg, pierce: p.pierce, life: 2.2
+    });
+  }
+}
+
+function hurtEnemy(e, dmg){
+  if (e.dead || e.hp <= 0) return;
+  e.hp -= dmg;
+  e.flash = 0.1;
+  if (e.hp <= 0){
+    e.dead = true;
+    G.kills++;
+    G.gems.push({
+      x: e.x + rand(-8, 8),
+      y: e.y + rand(-8, 8),
+      value: e.xp
+    });
+    spawnParticles(e.x, e.y, e.color, 9);
+    G.shake = Math.min(9, G.shake + 2);
+  }
+}
+
+function damagePlayer(dmg){
+  const p = G.player;
+  p.hp -= dmg * p.armor;
+  p.hurtCd = 0.6;
+  G.flash = 0.4;
+  G.shake = 9;
+
+  if (p.hp <= 0){
+    p.hp = 0;
+    gameOver();
+  }
+}
+
+function spawnParticles(x, y, color, n){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2;
+    const sp = rand(50, 210);
+    G.particles.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      life: rand(0.25, 0.6),
+      max: 0.6,
+      color,
+      size: rand(2, 4.5)
+    });
+  }
+}
+
+function spawnEnemy(){
+  const t = G.time;
+
+  // 加权随机挑选敌人类型
+  const pool = [['mail', 10]];
+  if (t > 20) pool.push(['bug', 9]);
+  if (t > 42) pool.push(['task', 8]);
+  if (t > 66) pool.push(['meet', 7]);
+  if (t > 95) pool.push(['boss', 2]);
+
+  let total = 0;
+  for (let i = 0; i < pool.length; i++) total += pool[i][1];
+
+  let r = Math.random() * total;
+  let type = 'mail';
+  for (let i = 0; i < pool.length; i++){
+    r -= pool[i][1];
+    if (r <= 0){ type = pool[i][0]; break; }
+  }
+
+  const def = ENEMY_TYPES[type];
+  const hpMul  = 1 + t * 0.015;
+  const spdMul = 1 + Math.min(t * 0.0012, 0.5);
+
+  // 从屏幕外随机一边生成
+  const pad = 55;
+  let x, y;
+  const side = Math.floor(Math.random() * 4);
+  if (side === 0){ x = rand(0, W); y = -pad; }
+  else if (side === 1){ x = W + pad; y = rand(0, H); }
+  else if (side === 2){ x = rand(0, W); y = H + pad; }
+  else { x = -pad; y = rand(0, H); }
+
+  G.enemies.push({
+    type, x, y, r: def.r,
+    hp: def.hp * hpMul,
+    maxHp: def.hp * hpMul,
+    speed: def.speed * spdMul,
+    dmg: def.dmg, xp: def.xp,
+    emoji: def.emoji, color: def.color,
+    flash: 0, dead: false
+  });
+}
+
+function gainXp(v){
+  if (!G || G.state !== 'playing') return;
+  G.xp += v * G.player.xpMul;
+  if (G.xp >= G.xpNeed){
+    G.xp -= G.xpNeed;
+    G.level++;
+    G.xpNeed = xpFor(G.level);
+    showLevelUp();
+  }
+}
+
+/* =========================================================
+   升级流程
+   ========================================================= */
+function showLevelUp(){
+  G.state = 'levelup';
+
+  const avail = UPGRADES.filter(u => (G.upCounts[u.id] || 0) < u.max);
+  const copy = avail.slice();
+  const picks = [];
+
+  while (picks.length < 3 && copy.length){
+    const i = Math.floor(Math.random() * copy.length);
+    picks.push(copy.splice(i, 1)[0]);
+  }
+  while (picks.length < 3) picks.push(FALLBACK_UP);
+
+  const box = $('cards');
+  box.innerHTML = '';
+  picks.forEach(u => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    const owned = G.upCounts[u.id] || 0;
+    const cntTxt = u.max < 90 ? `已选 ${owned}/${u.max}` : (owned ? `已选 ${owned}` : '');
+    el.innerHTML = `
+      <div class="ico">${u.icon}</div>
+      <div class="nm">${u.name}</div>
+      <div class="ds">${u.desc}</div>
+      <div class="cnt">${cntTxt}</div>`;
+    el.addEventListener('click', () => pickUpgrade(u));
+    box.appendChild(el);
+  });
+
+  $('levelup').classList.remove('hidden');
+}
+
+function pickUpgrade(u){
+  const p = G.player;
+  u.apply(p);
+  G.upCounts[u.id] = (G.upCounts[u.id] || 0) + 1;
+  $('levelup').classList.add('hidden');
+
+  // 可能一次攒够多级
+  if (G.xp >= G.xpNeed){
+    G.xp -= G.xpNeed;
+    G.level++;
+    G.xpNeed = xpFor(G.level);
+    showLevelUp();
+  } else {
+    G.state = 'playing';
+    lastT = performance.now();
+  }
+}
+
+/* =========================================================
+   暂停 / 结束
+   ========================================================= */
+function togglePause(){
+  if (!G) return;
+  if (G.state === 'playing'){
+    G.state = 'paused';
+    $('paused').classList.remove('hidden');
+    for (const k in keys) keys[k] = false;
+  } else if (G.state === 'paused'){
+    G.state = 'playing';
+    $('paused').classList.add('hidden');
+    lastT = performance.now();
+  }
+}
+
+function gameOver(){
+  G.state = 'dead';
+  const m = Math.floor(G.time / 60);
+  const s = Math.floor(G.time % 60);
+  $('stTime').textContent = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+  $('stKill').textContent = G.kills;
+  $('stLv').textContent = G.level;
+  $('over').classList.remove('hidden');
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function drawEmoji(ch, x, y, size, alpha){
+  if (alpha !== undefined && alpha < 1) ctx.globalAlpha = alpha;
+  ctx.font = size + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, x, y);
+  if (alpha !== undefined && alpha < 1) ctx.globalAlpha = 1;
+}
+
+function render(){
+  // 背景
+  ctx.fillStyle = '#080b11';
+  ctx.fillRect(0, 0, W, H);
+
+  // 网格
+  const gs = 48;
+  ctx.strokeStyle = 'rgba(80,130,200,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += gs){ ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = 0; y <= H; y += gs){ ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+
+  if (!G) return;
+
+  ctx.save();
+  if (G.shake > 0.3){
+    ctx.translate(rand(-G.shake, G.shake), rand(-G.shake, G.shake));
+  }
+
+  const p = G.player;
+
+  // 拾取范围提示
+  ctx.strokeStyle = 'rgba(34,211,238,0.13)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, p.pickup, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 经验宝石
+  for (let i = 0; i < G.gems.length; i++){
+    const g = G.gems[i];
+    ctx.fillStyle = 'rgba(74,222,128,0.22)';
+    ctx.beginPath(); ctx.arc(g.x, g.y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4ade80';
+    ctx.beginPath(); ctx.arc(g.x, g.y, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 粒子
+  for (let i = 0; i < G.particles.length; i++){
+    const pt = G.particles[i];
+    ctx.globalAlpha = Math.max(0, pt.life / pt.max);
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // 子弹
+  for (let i = 0; i < G.bullets.length; i++){
+    const b = G.bullets[i];
+    ctx.fillStyle = 'rgba(120,220,255,0.28)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#bdf3ff';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 敌人
+  for (let i = 0; i < G.enemies.length; i++){
+    const e = G.enemies[i];
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(e.x, e.y + e.r * 0.85, e.r * 0.8, e.r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawEmoji(e.emoji, e.x, e.y, e.r * 2.1);
+
+    if (e.flash > 0){
+      ctx.fillStyle = `rgba(255,255,255,${e.flash * 3})`;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // 玩家
+  const bob = 1 + Math.sin(G.time * 6) * 0.05;
+  // 光环
+  const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.6);
+  grd.addColorStop(0, 'rgba(79,209,255,0.35)');
+  grd.addColorStop(1, 'rgba(79,209,255,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.6, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + p.r * 0.9, p.r * 0.85, p.r * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const blink = (p.hurtCd > 0 && Math.floor(p.hurtCd * 22) % 2 === 0) ? 0.35 : 1;
+  drawEmoji('🐟', p.x, p.y, p.r * 2.2 * bob, blink);
+
+  ctx.restore();
+
+  // 受伤红屏
+  if (G.flash > 0){
+    ctx.fillStyle = `rgba(255,50,70,${G.flash * 0.3})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  updateHUD();
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+function updateHUD(){
+  if (!G) return;
+  const p = G.player;
+
+  $('hpfill').style.width = Math.max(0, (p.hp / p.maxHp) * 100) + '%';
+  $('hptxt').textContent = Math.ceil(p.hp) + ' / ' + Math.round(p.maxHp);
+
+  $('xpfill').style.width = Math.min(100, (G.xp / G.xpNeed) * 100) + '%';
+  $('xptxt').textContent = 'Lv.' + G.level + '   ' + Math.floor(G.xp) + ' / ' + G.xpNeed;
+
+  const m = Math.floor(G.time / 60);
+  const s = Math.floor(G.time % 60);
+  $('timer').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  $('kills').textContent = '☠ ' + G.kills;
+}
+
+/* =========================================================
+   主循环
+   ========================================================= */
+function loop(t){
+  requestAnimationFrame(loop);
+
+  let dt = (t - lastT) / 1000;
+  lastT = t;
+  if (!isFinite(dt) || dt < 0) dt = 0;
+  if (dt > 0.05) dt = 0.05;
+
+  if (G && G.state === 'playing') update(dt);
+  render();
+}
+
+/* =========================================================
+   按钮绑定
+   ========================================================= */
+$('btnStart').addEventListener('click', () => {
+  $('start').classList.add('hidden');
+  newGame();
+  lastT = performance.now();
+});
+
+$('btnRetry').addEventListener('click', () => {
+  $('over').classList.add('hidden');
+  $('levelup').classList.add('hidden');
+  $('paused').classList.add('hidden');
+  newGame();
+  lastT = performance.now();
+});
+
+$('btnResume').addEventListener('click', () => {
+  if (G && G.state === 'paused') togglePause();
+});
+
+// 防止页面滚动
+window.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
